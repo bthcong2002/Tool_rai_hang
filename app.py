@@ -13,17 +13,17 @@ st.set_page_config(page_title="Hệ Thống Phân Bổ Rải Hàng", page_icon="
 st.markdown("""
     <style>
     .main-title {
-        font-size: 38px;
+        font-size: 50px !important; /* Đã tăng kích thước chữ to hơn */
         color: #FF4B4B;
         text-align: center;
         font-weight: 900;
-        margin-bottom: 0px;
+        margin-bottom: 5px;
     }
     .sub-title {
-        font-size: 18px;
+        font-size: 24px !important; /* Đã tăng kích thước chữ phụ to hơn */
         color: #0068C9;
         text-align: center;
-        font-weight: 500;
+        font-weight: 600;
         margin-bottom: 30px;
     }
     .stButton>button {
@@ -40,7 +40,7 @@ st.markdown("""
     [data-testid="stExpander"] summary p {
         font-size: 22px !important;
         font-weight: 900 !important;
-        color: #D32F2F !important; /* Đổi màu đỏ đậm cho nổi bật */
+        color: #D32F2F !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -67,7 +67,7 @@ with st.expander("📋 HƯỚNG DẪN CHUẨN BỊ FILE DỮ LIỆU (Bấm để
 # ==========================================
 # KHU VỰC TẢI FILE
 # ==========================================
-st.markdown("### 📂 Tải lên dữ liệu gốc")
+st.markdown("### 📂 1. Tải lên dữ liệu gốc")
 uploaded_file = st.file_uploader("Vui lòng chọn file Excel (Định dạng .xlsx)", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
