@@ -1,0 +1,20 @@
+name: Keep Streamlit App Awake
+
+# Xác định khi nào tác vụ này sẽ chạy
+on:
+  schedule:
+    # Chạy tự động mỗi 4 tiếng (theo múi giờ UTC)
+    - cron: "0 */4 * * *"
+  
+  # Cài đặt này cho phép bạn vào GitHub bấm nút chạy thủ công để test
+  workflow_dispatch: 
+
+jobs:
+  ping-app:
+    runs-on: ubuntu-latest # Chạy trên máy ảo hệ điều hành Ubuntu của GitHub
+    
+    steps:
+      - name: Gửi request đến App Streamlit
+        # Lệnh curl sẽ truy cập vào trang web của bạn để tạo ra 1 lượt traffic
+        # Hãy thay link https://app-cua-ban.streamlit.app bằng link thật của bạn
+        run: curl -sL "https://app-cua-ban.streamlit.app" > /dev/null
