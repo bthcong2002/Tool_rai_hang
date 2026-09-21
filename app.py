@@ -43,6 +43,22 @@ st.markdown('<p class="main-title">🛒 HỆ THỐNG TỰ ĐỘNG PHÂN BỔ R�
 st.markdown('<p class="sub-title">Tối ưu hóa Khuyến Mãi & Cân bằng tải Vận hành</p>', unsafe_allow_html=True)
 
 # ==========================================
+# HƯỚNG DẪN SỬ DỤNG VÀ CHUẨN BỊ FILE
+# ==========================================
+with st.expander("📋 HƯỚNG DẪN CHUẨN BỊ FILE DỮ LIỆU (Bấm để xem chi tiết)", expanded=True):
+    st.markdown("""
+    Để hệ thống xử lý chính xác, file Excel tải lên **bắt buộc phải có các cột sau** (viết đúng chính tả, có dấu):
+    *   **Kho**: Mã hoặc tên Kho xử lý.
+    *   **Mã siêu thị**: Mã của Siêu thị nhận hàng.
+    *   **Lịch về hàng**: Định dạng chuỗi số cách nhau bằng dấu phẩy (VD: `0,2,4,6`, `1,3,5` hoặc `0,1,2,3,4,5,6`).
+    *   **Đợt KM**: Phân loại khuyến mãi (VD: `1 Lần/Tuần`, `2 Lần/Tuần`, `2 ngày KM/lần`...).
+    *   **Quy cách mua**: Số lượng hàng hóa trong 1 quy cách/lô (kiểu số).
+    *   **Tổng mới**: Tổng số lượng hàng cần rải trong tuần (kiểu số).
+    
+    *(Các cột thông tin khác như `Tên siêu thị`, `Mã sản phẩm`, `Tên sản phẩm` nên được giữ nguyên để thuận tiện cho việc trích xuất và đối chiếu kết quả sau khi rải).*
+    """)
+
+# ==========================================
 # KHU VỰC TẢI FILE
 # ==========================================
 st.markdown("### 📂 1. Tải lên dữ liệu gốc")
@@ -58,25 +74,28 @@ if uploaded_file is not None:
             # Đọc file từ upload
             df = pd.read_excel(uploaded_file)
             
-            # --- START LOGIC XỬ LÝ ---
+            # ==========================================
+            # LOGIC THUẬT TOÁN (BẢN FINAL)
+            # ==========================================
             df.rename(columns={'Tổng mới': 'Tổng tuần cũ'}, inplace=True)
-            
+
             days_mapping_new = {0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat'}
             for d in days_mapping_new.values():
-                df[d] = 0
-            
+                if d not in df.columns:
+                    df[d] = 0
+
             def check_case1(row):
                 lich = str(row['Lịch về hàng']).strip()
                 km = str(row['Đợt KM']).strip()
                 days = [x.strip() for x in lich.split(',') if x.strip()]
                 return len(days) == 7 and km in ['2 ngày KM/lân', '2 ngày KM/lần', '2 Lần/Tuần']
-            
+
             def check_km1(row):
                 return str(row['Đợt KM']).strip() == '1 Lần/Tuần'
-            
+
             df['Is_Case1'] = df.apply(check_case1, axis=1)
             df['Is_KM1'] = df.apply(check_km1, axis=1)
-            
+
             def calculate_tong_moi_final(row):
                 lich = str(row['Lịch về hàng']).strip()
                 tm = row['Tổng tuần cũ']
@@ -91,19 +110,18 @@ if uploaded_file is not None:
                 if row['Is_Case1']: return max(tm, qc * 4)
                 elif 0 < so_nhip < 7: return max(tm, qc * so_nhip)
                 return tm
-            
+
             df['Tổng mới final'] = df.apply(calculate_tong_moi_final, axis=1)
-            
+
             # 2.1 - Chia Siêu thị cho Case 1 (Tỷ lệ 31:24)
             case1_df = df[df['Is_Case1']].copy()
             st_totals_case1 = case1_df.groupby(['Kho', 'Mã siêu thị'])['Tổng mới final'].sum().reset_index()
-            
+
             group_assignment_case1 = {}
             for kho, group_df in st_totals_case1.groupby('Kho'):
                 st_list = group_df.sort_values('Tổng mới final', ascending=False).to_dict('records')
                 bin1, bin2 = {'sts': [], 'sum': 0}, {'sts': [], 'sum': 0}
                 
-                # Vòng lặp 1: Đã đổi toàn bộ st thành st_item
                 for st_item in st_list:
                     total = bin1['sum'] + bin2['sum'] + st_item['Tổng mới final']
                     if total == 0:
@@ -117,17 +135,16 @@ if uploaded_file is not None:
                             
                 for st_id in bin1['sts']: group_assignment_case1[st_id] = '0,1,3,5'
                 for st_id in bin2['sts']: group_assignment_case1[st_id] = '0,2,4,6'
-            
+
             # 2.2 - Chia Siêu thị cho Nhóm 1 Lần/Tuần (Tỷ lệ 50:50)
             km1_df = df[df['Is_KM1']].copy()
             st_totals_km1 = km1_df.groupby(['Kho', 'Mã siêu thị'])['Tổng mới final'].sum().reset_index()
-            
+
             group_assignment_km1 = {}
             for kho, group_df in st_totals_km1.groupby('Kho'):
                 st_list = group_df.sort_values('Tổng mới final', ascending=False).to_dict('records')
                 bin1, bin2 = {'sts': [], 'sum': 0}, {'sts': [], 'sum': 0}
                 
-                # Vòng lặp 2: Đã đổi toàn bộ st thành st_item
                 for st_item in st_list:
                     if bin1['sum'] <= bin2['sum']:
                         bin1['sts'].append(st_item['Mã siêu thị']); bin1['sum'] += st_item['Tổng mới final']
@@ -136,7 +153,7 @@ if uploaded_file is not None:
                         
                 for st_id in bin1['sts']: group_assignment_km1[st_id] = 'T3'
                 for st_id in bin2['sts']: group_assignment_km1[st_id] = 'T5'
-            
+
             def assign_lich_moi(row):
                 if row['Is_Case1']: 
                     return group_assignment_case1.get(row['Mã siêu thị'], "Giữ nguyên lịch cũ")
@@ -146,26 +163,32 @@ if uploaded_file is not None:
                 lm = row['Lịch về hàng mới']
                 if lm != "Giữ nguyên lịch cũ" and pd.notna(lm) and lm != "": return lm
                 return row['Lịch về hàng']
-            
+
             df['Lịch về hàng mới'] = df.apply(assign_lich_moi, axis=1)
             df['Lịch về hàng tính toán'] = df.apply(assign_lich_tinh_toan, axis=1)
-            
+
             def assign_lich_km(row):
-                if row['Is_Case1']:
-                    km = str(row['Đợt KM']).strip()
-                    lich_ve = row['Lịch về hàng mới']
+                km = str(row['Đợt KM']).strip()
+                
+                if km in ['2 ngày KM/lân', '2 ngày KM/lần', '2 Lần/Tuần']:
+                    lich_ve = str(row['Lịch về hàng tính toán']).strip()
+                    days = [int(x.strip()) for x in lich_ve.split(',') if x.strip().isdigit()]
+                    
+                    le_count = sum(1 for d in days if d in [1, 3, 5])
+                    chan_count = sum(1 for d in days if d in [0, 2, 4, 6])
+                    
                     if km in ['2 ngày KM/lân', '2 ngày KM/lần']:
-                        if lich_ve == '0,1,3,5': return 'T3, T5, T7'
-                        if lich_ve == '0,2,4,6': return 'T2, T4, T6'
+                        return 'T3, T5, T7' if le_count > chan_count else 'T2, T4, T6'
                     elif km == '2 Lần/Tuần':
-                        if lich_ve == '0,1,3,5': return 'T3, T7'
-                        if lich_ve == '0,2,4,6': return 'T2, T6'
+                        return 'T3, T7' if le_count > chan_count else 'T2, T6'
+                        
                 elif row['Is_KM1']:
                     return group_assignment_km1.get(row['Mã siêu thị'], "")
+                    
                 return ""
-            
+
             df['Lịch KM ST'] = df.apply(assign_lich_km, axis=1)
-            
+
             def distribute_by_quycach(row): 
                 lich_ve = row['Lịch về hàng tính toán']
                 try:
@@ -174,92 +197,132 @@ if uploaded_file is not None:
                 except: return row
                 
                 if pd.isnull(lich_ve) or qck == 0 or pd.isnull(tong_moi) or tong_moi == 0: return row
-                try: days = sorted([int(x.strip()) for x in str(lich_ve).split(',') if x.strip() != ""])
+                try: 
+                    original_days = sorted([int(x.strip()) for x in str(lich_ve).split(',') if x.strip() != ""])
                 except: return row
+                
+                days = original_days.copy()
+                len_days = len(days)
+                if len_days == 0: return row
+                
+                for d in days_mapping_new.values(): row[d] = 0
+                    
+                so_quy_cach_rai = int(tong_moi // qck)
+                phan_le = tong_moi - so_quy_cach_rai * qck
                 
                 is_km1 = row['Is_KM1']
                 is_new_schedule = (row['Lịch về hàng mới'] != "Giữ nguyên lịch cũ")
                 is_group2 = (str(lich_ve).strip() == '0,2,4,6')
-                
+
+                # ----------------------------------------
+                # LUỒNG 1: NHÓM KHUYẾN MÃI 1 LẦN/TUẦN
+                # ----------------------------------------
                 if is_km1:
-                    km_st = str(row['Lịch KM ST']).strip()
-                    target_day = 3 if km_st == 'T3' else (5 if km_st == 'T5' else -1)
-                    suppress_day = 5 if km_st == 'T3' else (3 if km_st == 'T5' else -1)
-                    
-                    if len(days) >= 6 and suppress_day in days:
-                        if random.random() >= 0.10: 
-                            days.remove(suppress_day)
-                            
-                    len_days = len(days)
-                    if len_days == 0: return row
-                    for d in days_mapping_new.values(): row[d] = 0
-                    
-                    so_quy_cach_rai = int(tong_moi // qck)
-                    phan_le = tong_moi - so_quy_cach_rai * qck
-                    
-                    vong = so_quy_cach_rai // len_days
-                    n_phan = so_quy_cach_rai % len_days
-                    
-                    has_target = target_day in days
-                    is_piggybank = False
-                    
-                    if vong == 0 and has_target:
-                        if so_quy_cach_rai >= 1:
-                            row[days_mapping_new[target_day]] += qck
-                            so_quy_cach_rai -= 1
-                            n_phan = so_quy_cach_rai
-                            is_piggybank = True
-                        elif phan_le > 0:
-                            row[days_mapping_new[target_day]] += phan_le
-                            phan_le = 0
-                            
-                    if vong > 0:
-                        for d in days:
-                            row[days_mapping_new[d]] += vong * qck
-                            
-                    extra_eligible_days = days.copy()
-                    if has_target and (vong > 0 or is_piggybank):
-                        extra_eligible_days.remove(target_day)
+                    if len(original_days) == 7:
+                        km_st = str(row['Lịch KM ST']).strip()
+                        day_after_km = 3 if km_st == 'T3' else (5 if km_st == 'T5' else -1)
                         
-                    if n_phan > 0:
-                        if not extra_eligible_days: extra_eligible_days = days.copy()
-                        chosen_days = random.sample(extra_eligible_days, n_phan)
-                        for d in chosen_days:
-                            row[days_mapping_new[d]] += qck
+                        vong = so_quy_cach_rai // 7
+                        so_phan_con_lai = so_quy_cach_rai % 7
+                        
+                        for _ in range(vong):
+                            for d in days:
+                                row[days_mapping_new[d]] += qck
+                                
+                        if so_phan_con_lai > 0:
+                            buoc_nhay = 1 if so_phan_con_lai == 6 else (2 if so_phan_con_lai in [5,4,3] else (4 if so_phan_con_lai == 2 else 1))
                             
-                    if phan_le > 0:
-                        if not extra_eligible_days: extra_eligible_days = days.copy()
-                        row[days_mapping_new[random.choice(extra_eligible_days)]] += phan_le
-            
+                            weights = [0.1 if (d == 3 or d == 5) else 1.0 for d in days]
+                            start_day = random.choices(days, weights=weights, k=1)[0]
+                            start_idx = days.index(start_day)
+                            
+                            chosen_days = [days[(start_idx + i * buoc_nhay) % 7] for i in range(so_phan_con_lai)]
+                            
+                            if day_after_km != -1 and day_after_km not in chosen_days:
+                                chosen_days[-1] = day_after_km
+                                
+                            for d in chosen_days:
+                                row[days_mapping_new[d]] += qck
+                                
+                        if phan_le > 0:
+                            if so_quy_cach_rai == 0 and day_after_km != -1:
+                                row[days_mapping_new[day_after_km]] += phan_le
+                            else:
+                                weights_le = [0.1 if (d == 3 or d == 5) else 1.0 for d in days]
+                                day_le = random.choices(days, weights=weights_le, k=1)[0]
+                                row[days_mapping_new[day_le]] += phan_le
+
+                    else:
+                        km_st = str(row['Lịch KM ST']).strip()
+                        target_day = 3 if km_st == 'T3' else (5 if km_st == 'T5' else -1)
+                        suppress_day = 5 if km_st == 'T3' else (3 if km_st == 'T5' else -1)
+                        
+                        if len(days) >= 6 and suppress_day in days:
+                            if random.random() >= 0.10: 
+                                days.remove(suppress_day)
+                                
+                        len_days_current = len(days)
+                        if len_days_current == 0: return row
+                        
+                        vong = so_quy_cach_rai // len_days_current
+                        n_phan = so_quy_cach_rai % len_days_current
+                        
+                        has_target = target_day in days
+                        is_piggybank = False
+                        
+                        if vong == 0 and has_target:
+                            if so_quy_cach_rai >= 1:
+                                row[days_mapping_new[target_day]] += qck
+                                so_quy_cach_rai -= 1
+                                n_phan = so_quy_cach_rai
+                                is_piggybank = True
+                            elif phan_le > 0:
+                                row[days_mapping_new[target_day]] += phan_le
+                                phan_le = 0
+                                
+                        if vong > 0:
+                            for d in days:
+                                row[days_mapping_new[d]] += vong * qck
+                                
+                        extra_eligible_days = days.copy()
+                        if has_target and (vong > 0 or is_piggybank):
+                            extra_eligible_days.remove(target_day)
+                            
+                        if n_phan > 0:
+                            if not extra_eligible_days: extra_eligible_days = days.copy()
+                            chosen_days = random.sample(extra_eligible_days, n_phan)
+                            for d in chosen_days:
+                                row[days_mapping_new[d]] += qck
+                                
+                        if phan_le > 0:
+                            if not extra_eligible_days: extra_eligible_days = days.copy()
+                            row[days_mapping_new[random.choice(extra_eligible_days)]] += phan_le
+
+                # ----------------------------------------
+                # LUỒNG 2: CÁC NHÓM CÒN LẠI 
+                # ----------------------------------------
                 else:
-                    len_days = len(days)
-                    if len_days == 0: return row
-                    for d in days_mapping_new.values(): row[d] = 0
-                    
-                    so_quy_cach_rai = int(tong_moi // qck)
-                    phan_le = tong_moi - so_quy_cach_rai * qck
-                    
-                    def add_day_idx(idx):
-                        day_index = days[idx]
+                    def add_day_idx_v7(idx):
+                        day_index = days[idx % len_days]
                         if day_index == 0 and is_group2 and is_new_schedule:
                             if random.random() < 0.875:
                                 other_days = [d for d in days if d != 0]
                                 day_index = random.choice(other_days)
                         row[days_mapping_new[day_index]] += qck
-            
-                    def rai_buoc_nhay(n, buoc, start):
-                        for i in range(n): add_day_idx((start + i*buoc) % len_days)
+
+                    def rai_buoc_nhay_v7(n, buoc, start):
+                        for i in range(n): add_day_idx_v7((start + i*buoc) % len_days)
                         
                     if len_days == 7:
                         vong = so_quy_cach_rai // 7
                         n_phan = so_quy_cach_rai % 7
                         for _ in range(vong):
-                            for i in range(7): add_day_idx(i)
+                            for i in range(7): add_day_idx_v7(i)
                             
                         if n_phan > 0:
                             buoc_nhay = 1 if n_phan == 6 else (2 if n_phan in [5,4,3] else (4 if n_phan == 2 else 1))
                             day_start = random.randint(0, len_days - 1)
-                            rai_buoc_nhay(n_phan, buoc_nhay, day_start)
+                            rai_buoc_nhay_v7(n_phan, buoc_nhay, day_start)
                         else:
                             day_start = random.randint(0, len_days - 1)
                             
@@ -273,7 +336,7 @@ if uploaded_file is not None:
                     else: 
                         start_pos = random.randint(0, len_days - 1)
                         for i in range(so_quy_cach_rai):
-                            add_day_idx((start_pos + i) % len_days)
+                            add_day_idx_v7((start_pos + i) % len_days)
                             
                         if phan_le > 0:
                             day_idx = random.choice(days)
@@ -286,17 +349,16 @@ if uploaded_file is not None:
                 return row
             
             df = df.apply(distribute_by_quycach, axis=1)
-            
+
             final_columns = [
                 'Mã siêu thị', 'Tên siêu thị', 'Mã sản phẩm', 'Tên sản phẩm', 'Kho', 
                 'Lịch về hàng', 'Quy cách mua', 'Đợt KM', 'Lịch KM ST',
                 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN', 
-                'Tổng tuần cũ', 'Lịch về hàng mới', 'Tổng mới final', 
+                'Tổng tuần cũ', 'Lịch về hàng mới', 'Lịch về hàng tính toán', 'Tổng mới final', 
                 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
             ]
-            
+
             df_output = df[[c for c in final_columns if c in df.columns]]
-            # --- END LOGIC XỬ LÝ ---
             
             # Xuất file ra bộ nhớ đệm (RAM) để tải về
             output_buffer = io.BytesIO()
@@ -306,10 +368,9 @@ if uploaded_file is not None:
 
         # Hiển thị kết quả
         st.markdown("### 📊 3. Kết quả phân bổ")
-        st.info(f"Đã xử lý xong **{len(df_output)}** dòng dữ liệu. Bản xem trước:")
+        st.info(f"✅ Quá trình rải hàng đã hoàn tất! Xử lý thành công **{len(df_output)}** dòng dữ liệu.")
         st.dataframe(df_output.head(100), use_container_width=True)
         
-        # Nút tải file xanh lá nổi bật
         st.markdown(
             """
             <style>
@@ -325,7 +386,7 @@ if uploaded_file is not None:
         st.download_button(
             label="⬇️ TẢI FILE EXCEL KẾT QUẢ",
             data=output_data,
-            file_name="Ket_Qua_Rai_Hang.xlsx",
+            file_name="Ket_Qua_Rai_Hang_Final.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary"
         )
