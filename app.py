@@ -36,6 +36,12 @@ st.markdown("""
     .stButton>button:hover {
         transform: scale(1.02);
     }
+    /* Làm to và in đậm tiêu đề của khung Hướng dẫn */
+    [data-testid="stExpander"] summary p {
+        font-size: 22px !important;
+        font-weight: 900 !important;
+        color: #D32F2F !important; /* Đổi màu đỏ đậm cho nổi bật */
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -61,7 +67,7 @@ with st.expander("📋 HƯỚNG DẪN CHUẨN BỊ FILE DỮ LIỆU (Bấm để
 # ==========================================
 # KHU VỰC TẢI FILE
 # ==========================================
-st.markdown("### 📂 1. Tải lên dữ liệu gốc")
+st.markdown("### 📂 Tải lên dữ liệu gốc")
 uploaded_file = st.file_uploader("Vui lòng chọn file Excel (Định dạng .xlsx)", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
