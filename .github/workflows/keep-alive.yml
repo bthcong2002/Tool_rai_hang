@@ -17,4 +17,4 @@ jobs:
       - name: Gửi request đến App Streamlit
         # Lệnh curl sẽ truy cập vào trang web của bạn để tạo ra 1 lượt traffic
         # Hãy thay link https://app-cua-ban.streamlit.app bằng link thật của bạn
-        run: curl -sL "https://app-cua-ban.streamlit.app" > /dev/null
+        run: curl -sL "https://toolraihang-lcf59pcasbszau4qgkueyd.streamlit.app/" > /dev/null
