@@ -1,7 +1,7 @@
 name: Keep Streamlit App Awake
 on:
   schedule:
-    - cron: "0 */4 * * *" # Chạy mỗi 12 tiếng, bạn có thể chỉnh lại
+    - cron: "0 */4 * * *" # Chạy mỗi 4 tiếng, bạn có thể chỉnh lại
   workflow_dispatch:
 
 jobs:
