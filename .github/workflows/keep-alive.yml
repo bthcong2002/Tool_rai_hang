@@ -1,20 +1,31 @@
 name: Keep Streamlit App Awake
-
-# Xác định khi nào tác vụ này sẽ chạy
 on:
   schedule:
-    # Chạy tự động mỗi 4 tiếng (theo múi giờ UTC)
-    - cron: "0 */4 * * *"
-  
-  # Cài đặt này cho phép bạn vào GitHub bấm nút chạy thủ công để test
-  workflow_dispatch: 
+    - cron: "0 */4 * * *" # Chạy mỗi 12 tiếng, bạn có thể chỉnh lại
+  workflow_dispatch:
 
 jobs:
   ping-app:
-    runs-on: ubuntu-latest # Chạy trên máy ảo hệ điều hành Ubuntu của GitHub
-    
+    runs-on: ubuntu-latest
     steps:
-      - name: Gửi request đến App Streamlit
-        # Lệnh curl sẽ truy cập vào trang web của bạn để tạo ra 1 lượt traffic
-        # Hãy thay link https://app-cua-ban.streamlit.app bằng link thật của bạn
-        run: curl -s "https://toolraihang-lcf59pcasbszau4qgkueyd.streamlit.app" > /dev/null
+      - name: Cài đặt Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cài đặt Playwright
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Mở trang bằng trình duyệt ảo
+        run: |
+          python -c "
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              page = browser.new_page()
+              page.goto('https://toolraihang-lcf59pcasbszau4qgkueyd.streamlit.app', wait_until='networkidle')
+              print('Đã mô phỏng truy cập thành công')
+              browser.close()
+          "
