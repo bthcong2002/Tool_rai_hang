@@ -81,7 +81,7 @@ if uploaded_file is not None:
             df = pd.read_excel(uploaded_file)
             
             # ==========================================
-            # LOGIC THUẬT TOÁN (BẢN FINAL V22)
+            # LOGIC THUẬT TOÁN (BẢN FINAL V22 + Cập nhật Tổng Mới KM 1 Lần/Tuần)
             # ==========================================
             df.rename(columns={'Tổng mới': 'Tổng tuần cũ'}, inplace=True)
 
@@ -109,6 +109,10 @@ if uploaded_file is not None:
                 
                 if pd.isna(qc): qc = 0
                 if pd.isna(tm): tm = 0
+                
+                # Nếu là nhóm KM 1 Lần/Tuần thì không kéo nhịp, giữ nguyên bằng tổng cũ
+                if row['Is_KM1']:
+                    return tm
                     
                 days = [x.strip() for x in lich.split(',') if x.strip()]
                 so_nhip = len(days)
