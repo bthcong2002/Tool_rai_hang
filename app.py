@@ -13,14 +13,14 @@ st.set_page_config(page_title="Hệ Thống Phân Bổ Rải Hàng", page_icon="
 st.markdown("""
     <style>
     .main-title {
-        font-size: 50px !important; /* Đã tăng kích thước chữ to hơn */
+        font-size: 50px !important; 
         color: #FF4B4B;
         text-align: center;
         font-weight: 900;
         margin-bottom: 5px;
     }
     .sub-title {
-        font-size: 24px !important; /* Đã tăng kích thước chữ phụ to hơn */
+        font-size: 24px !important; 
         color: #0068C9;
         text-align: center;
         font-weight: 600;
@@ -81,7 +81,7 @@ if uploaded_file is not None:
             df = pd.read_excel(uploaded_file)
             
             # ==========================================
-            # LOGIC THUẬT TOÁN (BẢN FINAL)
+            # LOGIC THUẬT TOÁN (BẢN FINAL V22)
             # ==========================================
             df.rename(columns={'Tổng mới': 'Tổng tuần cũ'}, inplace=True)
 
@@ -218,7 +218,6 @@ if uploaded_file is not None:
                 
                 is_km1 = row['Is_KM1']
                 is_new_schedule = (row['Lịch về hàng mới'] != "Giữ nguyên lịch cũ")
-                is_group2 = (str(lich_ve).strip() == '0,2,4,6')
 
                 # ----------------------------------------
                 # LUỒNG 1: NHÓM KHUYẾN MÃI 1 LẦN/TUẦN
@@ -305,53 +304,69 @@ if uploaded_file is not None:
                             row[days_mapping_new[random.choice(extra_eligible_days)]] += phan_le
 
                 # ----------------------------------------
-                # LUỒNG 2: CÁC NHÓM CÒN LẠI 
+                # LUỒNG 2: CÁC NHÓM CÒN LẠI (V22 Tinh chỉnh Random phần thừa)
                 # ----------------------------------------
                 else:
-                    def add_day_idx_v7(idx):
-                        day_index = days[idx % len_days]
-                        if day_index == 0 and is_group2 and is_new_schedule:
-                            if random.random() < 0.875:
-                                other_days = [d for d in days if d != 0]
-                                day_index = random.choice(other_days)
-                        row[days_mapping_new[day_index]] += qck
-
-                    def rai_buoc_nhay_v7(n, buoc, start):
-                        for i in range(n): add_day_idx_v7((start + i*buoc) % len_days)
+                    # Xử lý đặc biệt cho lịch mới 0,2,4,6 (T3, T5, T7, CN)
+                    if str(lich_ve).strip() == '0,2,4,6' and is_new_schedule:
+                        keep_sunday = random.random() >= 0.875
                         
-                    if len_days == 7:
-                        vong = so_quy_cach_rai // 7
-                        n_phan = so_quy_cach_rai % 7
-                        for _ in range(vong):
-                            for i in range(7): add_day_idx_v7(i)
-                            
-                        if n_phan > 0:
-                            buoc_nhay = 1 if n_phan == 6 else (2 if n_phan in [5,4,3] else (4 if n_phan == 2 else 1))
-                            day_start = random.randint(0, len_days - 1)
-                            rai_buoc_nhay_v7(n_phan, buoc_nhay, day_start)
+                        if keep_sunday:
+                            actual_days = [0, 2, 4, 6] # Rải 4 ngày: CN, T3, T5, T7
                         else:
-                            day_start = random.randint(0, len_days - 1)
+                            actual_days = [2, 4, 6]    # Gom 3 ngày: T3, T5, T7
                             
+                        len_actual = len(actual_days)
+                        vong = int(so_quy_cach_rai // len_actual)
+                        n_phan_le = int(so_quy_cach_rai % len_actual)
+                        
+                        # 1. Rải đều phần nguyên (đảm bảo số chia không lệch)
+                        for d in actual_days:
+                            row[days_mapping_new[d]] += vong * qck
+                            
+                        # 2. Rải phần lẻ NGẪU NHIÊN để tránh dồn số lượng vào T3
+                        if n_phan_le > 0:
+                            chosen_le_days = random.sample(actual_days, n_phan_le)
+                            for d in chosen_le_days:
+                                row[days_mapping_new[d]] += qck
+                            
+                        # 3. Xử lý phần dư lẻ (nhỏ hơn 1 QCM)
                         if phan_le > 0:
-                            day_cho = days[day_start] 
-                            if day_cho == 0 and is_group2 and is_new_schedule:
-                                if random.random() < 0.875:
-                                    other_days = [d for d in days if d != 0]
-                                    day_cho = random.choice(other_days)
-                            row[days_mapping_new[day_cho]] += phan_le
-                    else: 
-                        start_pos = random.randint(0, len_days - 1)
-                        for i in range(so_quy_cach_rai):
-                            add_day_idx_v7((start_pos + i) % len_days)
+                            row[days_mapping_new[random.choice(actual_days)]] += phan_le
+
+                    # Xử lý cho các lịch khác trong luồng 2 (giữ nguyên logic cũ)
+                    else:
+                        def add_day_idx_v7(idx):
+                            day_index = days[idx % len_days]
+                            row[days_mapping_new[day_index]] += qck
+
+                        def rai_buoc_nhay_v7(n, buoc, start):
+                            for i in range(n): add_day_idx_v7((start + i*buoc) % len_days)
                             
-                        if phan_le > 0:
-                            day_idx = random.choice(days)
-                            if day_idx == 0 and is_group2 and is_new_schedule:
-                                if random.random() < 0.875:
-                                    other_days = [d for d in days if d != 0]
-                                    day_idx = random.choice(other_days)
-                            row[days_mapping_new[day_idx]] += phan_le
-                            
+                        if len_days == 7:
+                            vong = int(so_quy_cach_rai // 7)
+                            n_phan = int(so_quy_cach_rai % 7)
+                            for _ in range(vong):
+                                for i in range(7): add_day_idx_v7(i)
+                                
+                            if n_phan > 0:
+                                buoc_nhay = 1 if n_phan == 6 else (2 if n_phan in [5,4,3] else (4 if n_phan == 2 else 1))
+                                day_start = random.randint(0, len_days - 1)
+                                rai_buoc_nhay_v7(n_phan, buoc_nhay, day_start)
+                            else:
+                                day_start = random.randint(0, len_days - 1)
+                                
+                            if phan_le > 0:
+                                day_cho = days[day_start] 
+                                row[days_mapping_new[day_cho]] += phan_le
+                        else: 
+                            start_pos = random.randint(0, len_days - 1)
+                            for i in range(int(so_quy_cach_rai)):
+                                add_day_idx_v7((start_pos + i) % len_days)
+                                
+                            if phan_le > 0:
+                                row[days_mapping_new[random.choice(days)]] += phan_le
+                                
                 return row
             
             df = df.apply(distribute_by_quycach, axis=1)
